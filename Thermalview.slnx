@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Thermalview.Cli/Thermalview.Cli.csproj" />
+    <Project Path="src/Thermalview.Core/Thermalview.Core.csproj" />
+    <Project Path="src/Thermalview.Parser/Thermalview.Parser.csproj" />
+    <Project Path="src/Thermalview.Server/Thermalview.Server.csproj" />
+  </Folder>
+</Solution>
