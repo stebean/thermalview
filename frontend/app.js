@@ -504,6 +504,25 @@
         return div.innerHTML;
     }
 
+    // ── Load Config & Active Printer ──
+    async function loadConfig() {
+        try {
+            const response = await fetch('/api/config');
+            if (response.ok) {
+                const data = await response.json();
+                if (data.activePrinter) {
+                    const { name, widthMm, charsPerLine } = data.activePrinter;
+                    dom.statusClients.textContent = `🖨️ Printer: ${name} (${widthMm}mm)`;
+                    setPaperWidth(widthMm);
+                } else if (data.activePrinterName) {
+                    dom.statusClients.textContent = `🖨️ Printer: ${data.activePrinterName}`;
+                }
+            }
+        } catch (err) {
+            console.log('[Config] Could not load printer config');
+        }
+    }
+
     // ── Load History ──
     async function loadHistory() {
         try {
@@ -570,6 +589,7 @@
     function init() {
         initEventListeners();
         connectWebSocket();
+        loadConfig();
         loadHistory();
         console.log('[Thermalview] Frontend initialized');
     }

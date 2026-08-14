@@ -59,7 +59,7 @@ public class ServerBuilder
 
         MapPrintEndpoint(app, printerName);
         MapWebSocketEndpoint(app);
-        MapConfigEndpoints(app);
+        MapConfigEndpoints(app, printerName);
         MapTicketEndpoints(app);
 
         return app;
@@ -156,15 +156,16 @@ public class ServerBuilder
     }
 
     /// <summary>
-    /// GET /api/config — Returns current printer configuration.
+    /// GET /api/config — Returns current printer configuration and active printer details.
     /// </summary>
-    private static void MapConfigEndpoints(WebApplication app)
+    private static void MapConfigEndpoints(WebApplication app, string printerName)
     {
         app.MapGet("/api/config", (HttpContext ctx) =>
         {
             var configStore = ctx.RequestServices.GetRequiredService<ConfigStore>();
             var printers = configStore.ListPrinters();
-            return Results.Json(new { printers }, JsonOptions);
+            var activePrinter = configStore.GetPrinter(printerName);
+            return Results.Json(new { activePrinterName = printerName, activePrinter, printers }, JsonOptions);
         });
     }
 
