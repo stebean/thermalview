@@ -10,88 +10,120 @@
 
 ## What it does
 
-Thermalview registers itself as a virtual printer in CUPS. When your application prints to it, the raw ESC/POS bytes are intercepted, parsed into structured JSON, and rendered in real time in your browser — faithful to the actual paper width.
+Thermalview registers itself as a virtual printer in CUPS. When your POS or desktop application prints to it, the raw ESC/POS bytes are intercepted, parsed into structured JSON, and rendered in real time in your browser — faithful to thermal paper styling and paper roll widths.
 
-**No physical printer needed. No internet connection. No dependencies.**
+**No physical printer needed. No internet connection. Zero dependencies.**
 
 ```
-Your App → prints via CUPS → Thermalview intercepts → parses ESC/POS → renders in browser
+Your POS / App → prints via CUPS → Thermalview intercepts → parses ESC/POS → renders in browser
 ```
 
 ## Features
 
-- 🖨️ **Virtual CUPS printer** — appears as a real printer to your application
-- 📡 **Real-time rendering** — see tickets as they print via WebSocket
-- 📏 **Paper width simulation** — 58mm, 80mm, and 112mm support
-- 🔤 **ESC/POS support** — alignment, bold, underline, font sizes, images, barcodes, cuts
-- 📜 **Ticket history** — browse previously printed tickets
+- 🖨️ **Virtual CUPS printer** — appears as a real system printer to your application
+- 📡 **Real-time rendering** — see tickets instantly via WebSocket as they print
+- 📏 **Paper width simulation** — 58mm, 80mm, and 112mm paper roll support
+- 🔤 **ESC/POS command engine** — alignment, bold, underline, font sizes, raster images, barcodes, paper cuts
+- 📜 **Ticket history** — browse and re-examine previously printed tickets
 - 🎨 **Faithful rendering** — monospace font, proportional widths, torn paper edges
-- ⚡ **Zero dependencies** — single self-contained binary, no .NET runtime needed
-- 🔒 **Fully local** — nothing leaves your machine
+- ⚡ **Single standalone binary** — 100% self-contained, no .NET runtime or external files needed
+- 🔒 **Fully local** — runs entirely offline on your dev machine
+
+---
 
 ## Quick Start
 
-### Install
+### 1. Download & Install Binary
 
 ```bash
-# Download the latest release
-curl -sSL https://github.com/stebean/thermalview/releases/latest/download/thermalview-linux-x64 -o thermalview
+# Download the latest single-file release
+curl -sSL https://github.com/stebean/thermalview/releases/latest/download/thermalview -o thermalview
 chmod +x thermalview
 sudo mv thermalview /usr/local/bin/
 ```
 
-### Setup a virtual printer
+### 2. Register Virtual Printer (Interactive Wizard)
+
+Simply run:
 
 ```bash
-# Register a virtual printer (80mm paper width)
-thermalview install my-printer --width 80
-
-# Start the server
-thermalview start my-printer
+thermalview install
 ```
 
-This will:
-1. Register a virtual printer named `my-printer` in CUPS
-2. Start the web server on `http://localhost:5000`
-3. Open your browser automatically
+The interactive installer will guide you:
 
-### Print to it
+```
+  🖨️  Thermalview — ESC/POS Virtual Printer
 
-From your application, simply print to the `my-printer` printer. Thermalview will intercept the ESC/POS data and render it in the browser.
+Select the paper roll width:
+  1) 58mm
+  2) 80mm
+  3) 112mm
+
+Option: 2
+
+Printer name (no spaces): printer80mm
+
+  ✅ Printer "printer80mm" registered in CUPS
+  ✅ Server starting at http://localhost:5000
+  🌐 Opening browser at http://localhost:5000
+```
+
+---
+
+## Integrating with your Application / POS (e.g. Flutter)
+
+### Option A: Print via System CUPS Queue (Native)
+Print directly from your app or system print dialog to the registered virtual printer (e.g. `printer80mm`). CUPS routes the print job to Thermalview, which immediately parses and displays the ticket.
+
+### Option B: Send ESC/POS Bytes via HTTP POST
+If your POS generates raw ESC/POS byte streams (e.g. Flutter using `esc_pos_utils_2`), send the bytes directly to Thermalview's API:
+
+```dart
+import 'package:http/http.dart' as http;
+
+// Generate raw ESC/POS bytes
+List<int> bytes = await generateReceiptBytes();
+
+// POST directly to Thermalview
+final response = await http.post(
+  Uri.parse('http://localhost:5000/api/print'),
+  headers: {'Content-Type': 'application/octet-stream'},
+  body: bytes,
+);
+```
+
+---
 
 ## CLI Commands
 
-```
-thermalview install <name> [--width 80] [--port 5000]
-    Register a new virtual thermal printer in CUPS
+| Command | Description |
+|---------|-------------|
+| `thermalview install` | Interactive wizard to create & register a virtual printer |
+| `thermalview start <name>` | Start the web server for a printer and open browser |
+| `thermalview start` | Show list of installed printers when name is omitted |
+| `thermalview list` | List all installed virtual printers with their configurations |
+| `thermalview remove <name>` | Unregister a printer from CUPS and delete configuration |
 
-thermalview start <name> [--no-browser]
-    Start the Thermalview server for a printer
-
-thermalview list
-    List installed virtual printers
-
-thermalview remove <name>
-    Remove a virtual printer from CUPS and config
-```
+---
 
 ## Architecture
 
 ```
-[Your App]
+[Your App / POS]
      |
-     | Prints via CUPS
+     | Prints via CUPS (or HTTP POST)
      ↓
 [CUPS Virtual Printer]
      |
-     | cups-backend.sh → HTTP POST
+     | cups-backend.sh → HTTP POST /api/print
      ↓
 [Thermalview Server (ASP.NET Core)]
      |
      ├── ESC/POS Parser → Structured JSON
      ├── WebSocket Hub → Broadcasts to browsers
      ├── HTTP API → Print endpoint, config, history
-     └── Static Files → Serves the frontend
+     └── Embedded Static Files → Serves frontend UI
                 ↓
 [Browser — localhost:5000]
      |
@@ -99,6 +131,8 @@ thermalview remove <name>
      ├── Ticket Renderer → Renders JSON as thermal paper
      └── UI → Width selector, history, test prints
 ```
+
+---
 
 ## Supported ESC/POS Commands
 
@@ -115,87 +149,41 @@ thermalview remove <name>
 | `GS v 0`| Raster bit image |
 | `GS k`  | Print barcode |
 
-## Development
+---
+
+## Local Development & Building
 
 ### Prerequisites
 
 - [.NET 10 SDK](https://dotnet.microsoft.com/download)
-- CUPS (usually pre-installed on Linux)
+- CUPS (pre-installed on Linux)
 
-### Build & Run
+### Build & Run locally
 
 ```bash
-# Clone the repo
 git clone https://github.com/stebean/thermalview.git
 cd thermalview
 
-# Build
+# Build solution
 dotnet build
 
-# Run the server in dev mode
-dotnet run --project src/Thermalview.Server
-
-# Or run the CLI
-dotnet run --project src/Thermalview.Cli -- start my-printer
+# Run interactive CLI
+dotnet run --project src/Thermalview.Cli -- install
 ```
 
-### Project Structure
-
-```
-thermalview/
-├── src/
-│   ├── Thermalview.Cli/         # CLI entry point (System.CommandLine)
-│   ├── Thermalview.Server/      # ASP.NET Core server, WebSocket hub
-│   ├── Thermalview.Parser/      # ESC/POS byte stream parser
-│   └── Thermalview.Core/        # Shared models, config store
-├── frontend/
-│   ├── index.html               # UI structure
-│   ├── style.css                # Dark theme, paper simulation
-│   └── app.js                   # WebSocket client, renderer
-├── scripts/
-│   └── cups-backend.sh          # CUPS backend script
-└── Thermalview.slnx             # .NET solution file
-```
-
-### Publishing
+### Build Single-File Self-Contained Binary
 
 ```bash
-# Self-contained single-file binary for Linux x64
 dotnet publish src/Thermalview.Cli/Thermalview.Cli.csproj \
-    -c Release \
-    -r linux-x64 \
-    --self-contained true \
-    -p:PublishSingleFile=true \
-    -p:PublishTrimmed=true \
-    -o publish/self-contained
+  -c Release \
+  -p:PublishSingleFile=true \
+  -o publish/
 ```
 
-## Configuration
+This compiles a single ~16MB standalone binary `publish/thermalview` with embedded frontend assets and CUPS scripts.
 
-Configuration is stored at `~/.thermalview/config.json`:
-
-```json
-{
-  "printers": [
-    {
-      "name": "my-printer",
-      "widthMm": 80,
-      "port": 5000,
-      "createdAt": "2026-01-01T00:00:00Z"
-    }
-  ]
-}
-```
-
-Ticket history is saved in `~/.thermalview/tickets/`.
-
-## What Thermalview does NOT do
-
-- ❌ Send anything to the internet
-- ❌ Require an account or API key
-- ❌ Need .NET installed (self-contained binary)
-- ❌ Touch your application code — it's just a system printer
+---
 
 ## License
 
-MIT
+[MIT](LICENSE) © stebean
