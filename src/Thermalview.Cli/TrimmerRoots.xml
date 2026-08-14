@@ -1,0 +1,17 @@
+<linker>
+  <!--
+    Preserve types used by System.Text.Json polymorphic deserialization.
+    Without this, the trimmer would remove TicketElement subclasses
+    since they're only referenced via [JsonDerivedType] attributes.
+  -->
+  <assembly fullname="Thermalview.Core">
+    <type fullname="Thermalview.Core.Models.*" preserve="all" />
+    <type fullname="Thermalview.Core.Services.*" preserve="all" />
+  </assembly>
+  <assembly fullname="Thermalview.Parser">
+    <type fullname="Thermalview.Parser.*" preserve="all" />
+  </assembly>
+  <assembly fullname="Thermalview.Server">
+    <type fullname="Thermalview.Server.*" preserve="all" />
+  </assembly>
+</linker>

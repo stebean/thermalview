@@ -1,4 +1,5 @@
 using System.CommandLine;
+using System.Text.RegularExpressions;
 using Thermalview.Core.Models;
 using Thermalview.Core.Services;
 using Thermalview.Server;
@@ -10,74 +11,128 @@ using Thermalview.Server;
 var rootCommand = new RootCommand("Thermalview — Virtual thermal printer for Linux");
 
 // ── thermalview install ──
-var installCommand = new Command("install", "Register a new virtual thermal printer in CUPS");
-var installNameArg = new Argument<string>("name") { Description = "Name for the virtual printer" };
-var installWidthOption = new Option<int>("--width", "-w") { Description = "Paper width in mm (58, 80, or 112)", DefaultValueFactory = _ => 80 };
-var installPortOption = new Option<int>("--port", "-p") { Description = "Server port", DefaultValueFactory = _ => 5000 };
+// Interactive wizard: asks for width and name, registers CUPS,
+// then starts the server and opens the browser automatically.
+var installCommand = new Command("install", "Register a new virtual thermal printer");
 
-installCommand.Arguments.Add(installNameArg);
-installCommand.Options.Add(installWidthOption);
-installCommand.Options.Add(installPortOption);
-
-installCommand.SetAction(parseResult =>
+installCommand.SetAction(async _ =>
 {
-    var name = parseResult.GetValue(installNameArg)!;
-    var width = parseResult.GetValue(installWidthOption);
-    var port = parseResult.GetValue(installPortOption);
+    Console.Clear();
+    PrintBanner();
 
+    // ── Step 1: Paper width ──
+    Console.WriteLine("Select the paper roll width:");
+    Console.WriteLine("  1) 58mm");
+    Console.WriteLine("  2) 80mm");
+    Console.WriteLine("  3) 112mm");
+    Console.WriteLine();
+
+    int widthMm;
+    while (true)
+    {
+        Console.Write("Option: ");
+        var input = Console.ReadLine()?.Trim();
+        widthMm = input switch
+        {
+            "1" => 58,
+            "2" => 80,
+            "3" => 112,
+            _ => 0
+        };
+
+        if (widthMm > 0) break;
+
+        Console.ForegroundColor = ConsoleColor.Red;
+        Console.WriteLine("  Invalid option. Enter 1, 2, or 3.");
+        Console.ResetColor();
+    }
+
+    Console.WriteLine();
+
+    // ── Step 2: Printer name ──
+    string printerName;
     var configStore = new ConfigStore();
 
-    // Validate width
-    if (width is not (58 or 80 or 112))
+    while (true)
     {
-        Console.ForegroundColor = ConsoleColor.Red;
-        Console.WriteLine($"Error: Invalid width {width}mm. Must be 58, 80, or 112.");
-        Console.ResetColor();
-        return;
+        Console.Write("Printer name (no spaces): ");
+        var raw = Console.ReadLine()?.Trim() ?? "";
+
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            WriteError("  Name cannot be empty.");
+            continue;
+        }
+
+        if (!Regex.IsMatch(raw, @"^[a-zA-Z0-9_\-]+$"))
+        {
+            WriteError("  Use only letters, numbers, underscores, or hyphens.");
+            continue;
+        }
+
+        if (configStore.GetPrinter(raw) is not null)
+        {
+            WriteError($"  A printer named '{raw}' already exists. Try a different name.");
+            continue;
+        }
+
+        printerName = raw;
+        break;
     }
 
-    // Check if printer already exists
-    if (configStore.GetPrinter(name) is not null)
+    Console.WriteLine();
+
+    // ── Step 3: Find a free port ──
+    int port = FindFreePort(5000);
+
+    // ── Step 4: Register in CUPS ──
+    Console.Write("  Registering printer in CUPS... ");
+
+    bool cupsOk = RegisterCupsPrinter(printerName);
+    if (cupsOk)
     {
-        Console.ForegroundColor = ConsoleColor.Red;
-        Console.WriteLine($"Error: A printer named '{name}' already exists.");
-        Console.ResetColor();
-        return;
+        WriteSuccess($"Printer \"{printerName}\" registered in CUPS");
+    }
+    else
+    {
+        WriteWarning($"Could not register in CUPS (manual setup may be required)");
     }
 
+    // ── Step 5: Save config ──
     var printer = new PrinterConfig
     {
-        Name = name,
-        WidthMm = width,
+        Name = printerName,
+        WidthMm = widthMm,
         Port = port
     };
-
-    // Register in CUPS
-    Console.WriteLine($"Installing virtual printer '{name}' ({width}mm, port {port})...");
-
-    if (!RegisterCupsPrinter(name))
-    {
-        Console.ForegroundColor = ConsoleColor.Red;
-        Console.WriteLine("Error: Failed to register printer in CUPS. Is CUPS installed?");
-        Console.ResetColor();
-        return;
-    }
-
-    // Save config
     configStore.AddPrinter(printer);
 
-    Console.ForegroundColor = ConsoleColor.Green;
-    Console.WriteLine($"✓ Printer '{name}' installed successfully!");
-    Console.ResetColor();
-    Console.WriteLine($"  Width: {width}mm ({printer.CharsPerLine} chars/line)");
-    Console.WriteLine($"  Port:  {port}");
+    // ── Step 6: Start server ──
+    WriteSuccess($"Server starting at http://localhost:{port}");
+
+    // Open browser
+    Console.Write("  Opening browser... ");
+    OpenBrowser($"http://localhost:{port}");
     Console.WriteLine();
-    Console.WriteLine($"Start it with: thermalview start {name}");
+
+    Console.WriteLine();
+    Console.WriteLine("  Press Ctrl+C to stop");
+    Console.WriteLine("  ─────────────────────────────────────────────");
+    Console.WriteLine();
+
+    // Start the server (blocking)
+    var frontendPath = ResolveFrontendPath();
+    var app = ServerBuilder.Build(printerName, port, frontendPath);
+    await app.RunAsync();
 });
 
-// ── thermalview start ──
-var startCommand = new Command("start", "Start the Thermalview server for a printer");
-var startNameArg = new Argument<string>("name") { Description = "Name of the printer to start" };
+// ── thermalview start <name> ──
+var startCommand = new Command("start", "Start the server for an installed printer");
+var startNameArg = new Argument<string>("name")
+{
+    Description = "Name of the printer to start",
+    Arity = ArgumentArity.ZeroOrOne
+};
 var startNoBrowserOption = new Option<bool>("--no-browser") { Description = "Don't open the browser automatically" };
 
 startCommand.Arguments.Add(startNameArg);
@@ -85,65 +140,64 @@ startCommand.Options.Add(startNoBrowserOption);
 
 startCommand.SetAction(async parseResult =>
 {
-    var name = parseResult.GetValue(startNameArg)!;
+    var name = parseResult.GetValue(startNameArg);
     var noBrowser = parseResult.GetValue(startNoBrowserOption);
 
     var configStore = new ConfigStore();
+
+    // No name given → show list and hint
+    if (string.IsNullOrWhiteSpace(name))
+    {
+        Console.WriteLine();
+        WriteError("Specify the printer name:");
+        Console.WriteLine("  thermalview start <name>");
+        Console.WriteLine();
+
+        var printers = configStore.ListPrinters();
+        if (printers.Count > 0)
+        {
+            Console.WriteLine("Installed printers:");
+            foreach (var p in printers)
+                Console.WriteLine($"  - {p.Name}");
+        }
+        else
+        {
+            Console.WriteLine("No printers installed. Run 'thermalview install' first.");
+        }
+
+        Console.WriteLine();
+        return;
+    }
+
     var printer = configStore.GetPrinter(name);
 
     if (printer is null)
     {
-        Console.ForegroundColor = ConsoleColor.Red;
-        Console.WriteLine($"Error: Printer '{name}' not found. Run 'thermalview list' to see installed printers.");
-        Console.ResetColor();
+        WriteError($"Printer '{name}' not found.");
+
+        var all = configStore.ListPrinters();
+        if (all.Count > 0)
+        {
+            Console.WriteLine();
+            Console.WriteLine("Installed printers:");
+            foreach (var p in all) Console.WriteLine($"  - {p.Name}");
+        }
+
         return;
     }
 
-    // Resolve frontend path
-    var frontendPath = ResolveFrontendPath();
-
-    Console.ForegroundColor = ConsoleColor.Cyan;
-    Console.WriteLine(@"
-  _____ _                           _       _               
- |_   _| |__   ___ _ __ _ __ ___  __ _| |_   _(_) _____      __
-   | | | '_ \ / _ \ '__| '_ ` _ \ / _` | \ \ / / |/ _ \ \ /\ / /
-   | | | | | |  __/ |  | | | | | | (_| | |\ V /| |  __/\ V  V / 
-   |_| |_| |_|\___|_|  |_| |_| |_|\__,_|_| \_/ |_|\___| \_/\_/  
-");
-    Console.ResetColor();
-
-    Console.WriteLine($"  Printer: {name} ({printer.WidthMm}mm, {printer.CharsPerLine} chars/line)");
-    Console.WriteLine($"  Server:  http://localhost:{printer.Port}");
-    Console.WriteLine($"  Frontend: {frontendPath}");
+    PrintBanner();
+    Console.WriteLine($"  Printer : {printer.Name}  ({printer.WidthMm}mm · {printer.CharsPerLine} chars/line)");
+    Console.WriteLine($"  Server  : http://localhost:{printer.Port}");
     Console.WriteLine();
 
-    // Open browser
-    if (!noBrowser)
-    {
-        try
-        {
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = "xdg-open",
-                Arguments = $"http://localhost:{printer.Port}",
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true
-            });
-            Console.WriteLine("  Browser opened automatically");
-        }
-        catch
-        {
-            Console.WriteLine($"  Open http://localhost:{printer.Port} in your browser");
-        }
-    }
+    if (!noBrowser) OpenBrowser($"http://localhost:{printer.Port}");
 
-    Console.WriteLine();
-    Console.WriteLine("  Press Ctrl+C to stop the server");
+    Console.WriteLine("  Press Ctrl+C to stop");
     Console.WriteLine("  ─────────────────────────────────────────────");
     Console.WriteLine();
 
-    // Start server
+    var frontendPath = ResolveFrontendPath();
     var app = ServerBuilder.Build(name, printer.Port, frontendPath);
     await app.RunAsync();
 });
@@ -156,27 +210,27 @@ listCommand.SetAction(_ =>
     var configStore = new ConfigStore();
     var printers = configStore.ListPrinters();
 
+    Console.WriteLine();
+
     if (printers.Count == 0)
     {
-        Console.WriteLine("No printers installed. Run 'thermalview install <name>' to add one.");
+        Console.WriteLine("No printers installed. Run 'thermalview install' to add one.");
+        Console.WriteLine();
         return;
     }
 
-    Console.WriteLine();
-    Console.WriteLine($"  {"Name",-25} {"Width",-10} {"Port",-8} {"Created",-20}");
-    Console.WriteLine($"  {"─",-25} {"─",-10} {"─",-8} {"─",-20}");
+    Console.WriteLine($"  {"Name",-28} {"Width",-8} {"Port",-8} {"Installed"}");
+    Console.WriteLine($"  {"─",-28} {"─",-8} {"─",-8} {"─",-20}");
 
     foreach (var p in printers)
-    {
-        Console.WriteLine($"  {p.Name,-25} {p.WidthMm + "mm",-10} {p.Port,-8} {p.CreatedAt:yyyy-MM-dd HH:mm}");
-    }
+        Console.WriteLine($"  {p.Name,-28} {p.WidthMm + "mm",-8} {p.Port,-8} {p.CreatedAt.ToLocalTime():yyyy-MM-dd HH:mm}");
 
     Console.WriteLine();
     Console.WriteLine($"  {printers.Count} printer(s) installed");
     Console.WriteLine();
 });
 
-// ── thermalview remove ──
+// ── thermalview remove <name> ──
 var removeCommand = new Command("remove", "Remove a virtual printer");
 var removeNameArg = new Argument<string>("name") { Description = "Name of the printer to remove" };
 
@@ -189,21 +243,14 @@ removeCommand.SetAction(parseResult =>
 
     if (configStore.GetPrinter(name) is null)
     {
-        Console.ForegroundColor = ConsoleColor.Red;
-        Console.WriteLine($"Error: Printer '{name}' not found.");
-        Console.ResetColor();
+        WriteError($"Printer '{name}' not found.");
         return;
     }
 
-    // Remove from CUPS
     UnregisterCupsPrinter(name);
-
-    // Remove from config
     configStore.RemovePrinter(name);
 
-    Console.ForegroundColor = ConsoleColor.Green;
-    Console.WriteLine($"✓ Printer '{name}' removed.");
-    Console.ResetColor();
+    WriteSuccess($"Printer '{name}' removed.");
 });
 
 // ── Register commands ──
@@ -215,67 +262,113 @@ rootCommand.Subcommands.Add(removeCommand);
 return rootCommand.Parse(args).Invoke();
 
 // ──────────────────────────────────────────────
-// Helper functions
+// Helpers
 // ──────────────────────────────────────────────
+
+static void PrintBanner()
+{
+    Console.ForegroundColor = ConsoleColor.Yellow;
+    Console.WriteLine();
+    Console.WriteLine("  🖨️  Thermalview — ESC/POS Virtual Printer");
+    Console.ResetColor();
+    Console.WriteLine();
+}
+
+static void WriteSuccess(string message)
+{
+    Console.ForegroundColor = ConsoleColor.Green;
+    Console.Write("  ✅ ");
+    Console.ResetColor();
+    Console.WriteLine(message);
+}
+
+static void WriteWarning(string message)
+{
+    Console.ForegroundColor = ConsoleColor.Yellow;
+    Console.Write("  ⚠️  ");
+    Console.ResetColor();
+    Console.WriteLine(message);
+}
+
+static void WriteError(string message)
+{
+    Console.ForegroundColor = ConsoleColor.Red;
+    Console.Write("  ❌ ");
+    Console.ResetColor();
+    Console.WriteLine(message);
+}
+
+/// <summary>
+/// Opens the browser using xdg-open (Linux).
+/// </summary>
+static void OpenBrowser(string url)
+{
+    try
+    {
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = "xdg-open",
+            Arguments = url,
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
+        });
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.Write("  🌐 ");
+        Console.ResetColor();
+        Console.WriteLine($"Opening browser at {url}");
+    }
+    catch
+    {
+        Console.WriteLine($"  Open {url} in your browser");
+    }
+}
+
+/// <summary>
+/// Finds the first available port starting from <paramref name="start"/>.
+/// </summary>
+static int FindFreePort(int start)
+{
+    for (int port = start; port < start + 100; port++)
+    {
+        try
+        {
+            using var listener = new System.Net.Sockets.TcpListener(
+                System.Net.IPAddress.Loopback, port);
+            listener.Start();
+            listener.Stop();
+            return port;
+        }
+        catch { /* port in use, try next */ }
+    }
+    return start;
+}
 
 /// <summary>
 /// Registers a virtual printer in CUPS using lpadmin.
-/// The printer uses a custom CUPS backend that POSTs raw data to Thermalview.
 /// </summary>
 static bool RegisterCupsPrinter(string name)
 {
     try
     {
-        // Find the cups-backend.sh script
         var backendScript = FindCupsBackendScript();
-        if (backendScript is null)
+
+        if (backendScript is not null)
         {
-            Console.WriteLine("Warning: cups-backend.sh not found. You'll need to set up CUPS manually.");
-            return true; // Don't block installation
+            // Install backend to CUPS
+            var cupsBackendDest = "/usr/lib/cups/backend/thermalview";
+            RunSudo($"cp \"{backendScript}\" \"{cupsBackendDest}\"");
+            RunSudo($"chmod 755 \"{cupsBackendDest}\"");
         }
 
-        // Install the backend script to CUPS backends directory
-        var cupsBackendDir = "/usr/lib/cups/backend";
-        var backendDest = Path.Combine(cupsBackendDir, "thermalview");
-
-        var installProcess = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-        {
-            FileName = "sudo",
-            Arguments = $"cp {backendScript} {backendDest}",
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true
-        });
-        installProcess?.WaitForExit();
-
-        // Set permissions
-        var chmodProcess = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-        {
-            FileName = "sudo",
-            Arguments = $"chmod 755 {backendDest}",
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true
-        });
-        chmodProcess?.WaitForExit();
-
-        // Register the printer with lpadmin
-        var process = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-        {
-            FileName = "sudo",
-            Arguments = $"lpadmin -p {name} -E -v thermalview:/ -m raw",
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true
-        });
-        process?.WaitForExit();
-
-        return process?.ExitCode == 0;
+        // Register the printer queue
+        var result = RunSudo($"lpadmin -p {name} -E -v thermalview:/ -m raw");
+        return result == 0;
     }
     catch (Exception ex)
     {
-        Console.WriteLine($"Warning: Could not register CUPS printer: {ex.Message}");
-        return true; // Don't block installation
+        Console.WriteLine($"\n  (Warning: {ex.Message})");
+        return false;
     }
 }
 
@@ -284,22 +377,25 @@ static bool RegisterCupsPrinter(string name)
 /// </summary>
 static void UnregisterCupsPrinter(string name)
 {
-    try
+    try { RunSudo($"lpadmin -x {name}"); }
+    catch { /* best effort */ }
+}
+
+/// <summary>
+/// Runs a sudo command and returns the exit code.
+/// </summary>
+static int RunSudo(string arguments)
+{
+    var p = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
     {
-        var process = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-        {
-            FileName = "sudo",
-            Arguments = $"lpadmin -x {name}",
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true
-        });
-        process?.WaitForExit();
-    }
-    catch
-    {
-        Console.WriteLine("Warning: Could not remove CUPS printer. You may need to remove it manually.");
-    }
+        FileName = "sudo",
+        Arguments = arguments,
+        UseShellExecute = false,
+        RedirectStandardOutput = true,
+        RedirectStandardError = true
+    });
+    p?.WaitForExit();
+    return p?.ExitCode ?? 1;
 }
 
 /// <summary>
@@ -310,25 +406,23 @@ static string? FindCupsBackendScript()
     var candidates = new[]
     {
         Path.Combine(AppContext.BaseDirectory, "scripts", "cups-backend.sh"),
-        Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "scripts", "cups-backend.sh"),
         Path.Combine(AppContext.BaseDirectory, "..", "scripts", "cups-backend.sh"),
+        Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "scripts", "cups-backend.sh"),
     };
-
     return candidates.FirstOrDefault(File.Exists);
 }
 
 /// <summary>
-/// Resolves the path to the frontend directory.
+/// Finds the frontend directory relative to the executable.
 /// </summary>
 static string ResolveFrontendPath()
 {
     var candidates = new[]
     {
         Path.Combine(AppContext.BaseDirectory, "frontend"),
-        Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "frontend"),
         Path.Combine(AppContext.BaseDirectory, "..", "frontend"),
+        Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "frontend"),
     };
-
     var found = candidates.FirstOrDefault(Directory.Exists);
     return found is not null ? Path.GetFullPath(found) : Path.Combine(AppContext.BaseDirectory, "frontend");
 }

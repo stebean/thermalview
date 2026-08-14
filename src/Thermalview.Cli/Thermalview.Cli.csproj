@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
     <ProjectReference Include="..\Thermalview.Server\Thermalview.Server.csproj" />
@@ -12,9 +12,31 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
+    <AssemblyName>thermalview</AssemblyName>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
+
+  <!-- Self-contained publish settings — only active when running dotnet publish -->
+  <PropertyGroup Condition="'$(PublishSingleFile)' == 'true'">
+    <RuntimeIdentifier>linux-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishTrimmed>true</PublishTrimmed>
+    <TrimmerRootDescriptor>TrimmerRoots.xml</TrimmerRootDescriptor>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+  </PropertyGroup>
+
+  <!-- Bundle frontend and scripts alongside the binary on publish -->
+  <ItemGroup>
+    <None Update="..\..\frontend\**">
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <Link>frontend\%(RecursiveDir)%(Filename)%(Extension)</Link>
+    </None>
+    <None Update="..\..\scripts\**">
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+      <Link>scripts\%(RecursiveDir)%(Filename)%(Extension)</Link>
+    </None>
+  </ItemGroup>
 
 </Project>
