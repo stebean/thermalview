@@ -81,10 +81,16 @@ public class ServerBuilder
         }
 
         // Production: serve from embedded resources
-        // Files are embedded under the "frontend\" logical prefix
         Console.WriteLine("[Server] Serving frontend from embedded resources");
         var assembly = typeof(ServerBuilder).Assembly;
-        return new ManifestEmbeddedFileProvider(assembly, "frontend");
+        try
+        {
+            return new ManifestEmbeddedFileProvider(assembly, "frontend");
+        }
+        catch
+        {
+            return new EmbeddedFileProvider(assembly, "frontend");
+        }
     }
 
     /// <summary>
