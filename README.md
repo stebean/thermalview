@@ -37,9 +37,7 @@ Your POS / App → prints via CUPS → Thermalview intercepts → parses ESC/POS
 
 ```bash
 # Download the latest single-file release
-curl -sSL https://github.com/stebean/thermalview/releases/latest/download/thermalview -o thermalview
-chmod +x thermalview
-sudo mv thermalview /usr/local/bin/
+curl -sSL https://github.com/stebean/thermalview/releases/latest/download/thermalview -o thermalview && chmod +x thermalview && sudo mv thermalview /usr/local/bin/
 ```
 
 ### 2. Register Virtual Printer (Interactive Wizard)
