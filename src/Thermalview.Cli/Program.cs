@@ -351,17 +351,19 @@ static bool RegisterCupsPrinter(string name)
 {
     try
     {
-        var backendScript = FindCupsBackendScript();
+        // Extract the backend script from embedded resources
+        var backendScript = ExtractCupsBackendScript();
 
         if (backendScript is not null)
         {
-            // Install backend to CUPS
             var cupsBackendDest = "/usr/lib/cups/backend/thermalview";
             RunSudo($"cp \"{backendScript}\" \"{cupsBackendDest}\"");
             RunSudo($"chmod 755 \"{cupsBackendDest}\"");
+
+            // Clean up temp file
+            try { File.Delete(backendScript); } catch { }
         }
 
-        // Register the printer queue
         var result = RunSudo($"lpadmin -p {name} -E -v thermalview:/ -m raw");
         return result == 0;
     }
@@ -399,23 +401,37 @@ static int RunSudo(string arguments)
 }
 
 /// <summary>
-/// Finds the cups-backend.sh script relative to the executable.
+/// Extracts cups-backend.sh from embedded resources to a temp file.
+/// Returns the temp file path, or null if the resource isn't found.
 /// </summary>
-static string? FindCupsBackendScript()
+static string? ExtractCupsBackendScript()
 {
-    var candidates = new[]
+    var assembly = System.Reflection.Assembly.GetExecutingAssembly();
+    using var stream = assembly.GetManifestResourceStream("cups-backend.sh");
+
+    if (stream is null)
     {
-        Path.Combine(AppContext.BaseDirectory, "scripts", "cups-backend.sh"),
-        Path.Combine(AppContext.BaseDirectory, "..", "scripts", "cups-backend.sh"),
-        Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "scripts", "cups-backend.sh"),
-    };
-    return candidates.FirstOrDefault(File.Exists);
+        // Fallback: look on disk (dev mode)
+        var candidates = new[]
+        {
+            Path.Combine(AppContext.BaseDirectory, "scripts", "cups-backend.sh"),
+            Path.Combine(AppContext.BaseDirectory, "..", "scripts", "cups-backend.sh"),
+            Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "scripts", "cups-backend.sh"),
+        };
+        return candidates.FirstOrDefault(File.Exists);
+    }
+
+    // Write to a temp file
+    var tmpPath = Path.Combine(Path.GetTempPath(), "thermalview-cups-backend.sh");
+    using var fs = File.Create(tmpPath);
+    stream.CopyTo(fs);
+    return tmpPath;
 }
 
 /// <summary>
-/// Finds the frontend directory relative to the executable.
+/// Finds the frontend directory for dev mode (optional, embedded is used in production).
 /// </summary>
-static string ResolveFrontendPath()
+static string? ResolveFrontendPath()
 {
     var candidates = new[]
     {
@@ -423,6 +439,5 @@ static string ResolveFrontendPath()
         Path.Combine(AppContext.BaseDirectory, "..", "frontend"),
         Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "frontend"),
     };
-    var found = candidates.FirstOrDefault(Directory.Exists);
-    return found is not null ? Path.GetFullPath(found) : Path.Combine(AppContext.BaseDirectory, "frontend");
+    return candidates.FirstOrDefault(Directory.Exists);
 }

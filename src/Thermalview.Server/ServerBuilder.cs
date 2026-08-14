@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.Extensions.FileProviders;
 using Thermalview.Core.Models;
 using Thermalview.Core.Services;
 using Thermalview.Parser;
@@ -23,8 +24,11 @@ public class ServerBuilder
     /// </summary>
     /// <param name="printerName">Name of the printer this server instance serves.</param>
     /// <param name="port">Port to listen on.</param>
-    /// <param name="frontendPath">Path to the frontend static files directory.</param>
-    public static WebApplication Build(string printerName, int port, string frontendPath)
+    /// <param name="frontendPath">
+    /// Optional path to the frontend directory on disk.
+    /// When null or not found, falls back to embedded resources.
+    /// </param>
+    public static WebApplication Build(string printerName, int port, string? frontendPath = null)
     {
         var builder = WebApplication.CreateBuilder();
 
@@ -44,18 +48,12 @@ public class ServerBuilder
         // Enable WebSockets
         app.UseWebSockets();
 
-        // Serve static files from the frontend directory
-        if (Directory.Exists(frontendPath))
-        {
-            app.UseDefaultFiles(new DefaultFilesOptions
-            {
-                FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(frontendPath)
-            });
-            app.UseStaticFiles(new StaticFileOptions
-            {
-                FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(frontendPath)
-            });
-        }
+        // ── Static file serving ──
+        // Priority: filesystem (dev) → embedded resources (production binary)
+        IFileProvider fileProvider = BuildFileProvider(frontendPath);
+
+        app.UseDefaultFiles(new DefaultFilesOptions { FileProvider = fileProvider });
+        app.UseStaticFiles(new StaticFileOptions { FileProvider = fileProvider });
 
         // --- API Endpoints ---
 
@@ -65,6 +63,27 @@ public class ServerBuilder
         MapTicketEndpoints(app);
 
         return app;
+    }
+
+    /// <summary>
+    /// Builds the file provider for serving static frontend files.
+    /// Uses the filesystem when a valid path is provided (dev mode),
+    /// otherwise serves from embedded resources baked into the assembly.
+    /// </summary>
+    private static IFileProvider BuildFileProvider(string? frontendPath)
+    {
+        // Dev mode: use the filesystem when the directory exists
+        if (frontendPath is not null && Directory.Exists(frontendPath))
+        {
+            Console.WriteLine($"[Server] Serving frontend from disk: {frontendPath}");
+            return new PhysicalFileProvider(frontendPath);
+        }
+
+        // Production: serve from embedded resources
+        // Files are embedded under the "frontend\" logical prefix
+        Console.WriteLine("[Server] Serving frontend from embedded resources");
+        var assembly = typeof(ServerBuilder).Assembly;
+        return new ManifestEmbeddedFileProvider(assembly, "frontend");
     }
 
     /// <summary>

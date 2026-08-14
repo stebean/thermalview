@@ -9,6 +9,13 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <!-- Embed frontend files into the assembly so no external files are needed -->
+    <GenerateEmbeddedFilesManifest>true</GenerateEmbeddedFilesManifest>
   </PropertyGroup>
+
+  <!-- Embed frontend files as resources with virtual paths matching the web root -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\frontend\**" LogicalName="frontend\%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
 
 </Project>

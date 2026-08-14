@@ -27,16 +27,9 @@
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
   </PropertyGroup>
 
-  <!-- Bundle frontend and scripts alongside the binary on publish -->
+  <!-- Embed the CUPS backend script so it can be extracted at install time -->
   <ItemGroup>
-    <None Update="..\..\frontend\**">
-      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
-      <Link>frontend\%(RecursiveDir)%(Filename)%(Extension)</Link>
-    </None>
-    <None Update="..\..\scripts\**">
-      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
-      <Link>scripts\%(RecursiveDir)%(Filename)%(Extension)</Link>
-    </None>
+    <EmbeddedResource Include="..\..\scripts\cups-backend.sh" LogicalName="cups-backend.sh" />
   </ItemGroup>
 
 </Project>
