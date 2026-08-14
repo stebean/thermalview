@@ -213,39 +213,38 @@ body {
     margin-bottom: 0;
 }
 
-/* ── Width Selector ── */
-.width-selector {
+/* ── Printer Card ── */
+.printer-card {
     display: flex;
-    gap: 6px;
+    align-items: center;
+    gap: 12px;
     background: var(--bg-primary);
-    padding: 4px;
+    padding: 10px 12px;
     border-radius: var(--radius-md);
+    border: 1px solid var(--border);
 }
 
-.width-btn {
-    flex: 1;
-    padding: 8px 4px;
-    border: none;
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--text-secondary);
-    font-family: var(--font-mono);
-    font-size: 0.8rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all var(--transition-fast);
+.printer-card-icon {
+    font-size: 1.3rem;
 }
 
-.width-btn:hover {
-    background: var(--bg-hover);
-    color: var(--text-primary);
+.printer-card-details {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
 }
 
-.width-btn.active {
-    background: var(--accent);
-    color: var(--text-inverse);
+.printer-card-name {
+    font-size: 0.9rem;
     font-weight: 700;
-    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+}
+
+.printer-card-width {
+    font-size: 0.75rem;
+    color: var(--accent);
+    font-weight: 600;
 }
 
 /* ── Ticket List ── */

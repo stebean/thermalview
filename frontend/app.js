@@ -32,7 +32,8 @@
         metaSize: document.getElementById('meta-size'),
         metaElements: document.getElementById('meta-elements'),
         welcomeState: document.getElementById('welcome-state'),
-        widthSelector: document.getElementById('width-selector'),
+        printerNameDisplay: document.getElementById('printer-name-display'),
+        printerWidthDisplay: document.getElementById('printer-width-display'),
         btnTestPrint: document.getElementById('btn-test-print'),
         btnClearHistory: document.getElementById('clear-history'),
     };
@@ -511,11 +512,14 @@
             if (response.ok) {
                 const data = await response.json();
                 if (data.activePrinter) {
-                    const { name, widthMm, charsPerLine } = data.activePrinter;
-                    dom.statusClients.textContent = `🖨️ Printer: ${name} (${widthMm}mm)`;
+                    const { name, widthMm } = data.activePrinter;
+                    if (dom.printerNameDisplay) dom.printerNameDisplay.textContent = name;
+                    if (dom.printerWidthDisplay) dom.printerWidthDisplay.textContent = `${widthMm}mm roll`;
+                    dom.statusClients.textContent = `🖨️ ${name} (${widthMm}mm)`;
                     setPaperWidth(widthMm);
                 } else if (data.activePrinterName) {
-                    dom.statusClients.textContent = `🖨️ Printer: ${data.activePrinterName}`;
+                    if (dom.printerNameDisplay) dom.printerNameDisplay.textContent = data.activePrinterName;
+                    dom.statusClients.textContent = `🖨️ ${data.activePrinterName}`;
                 }
             }
         } catch (err) {
@@ -548,14 +552,6 @@
 
     // ── Event Listeners ──
     function initEventListeners() {
-        // Width selector
-        dom.widthSelector.addEventListener('click', (e) => {
-            const btn = e.target.closest('.width-btn');
-            if (btn) {
-                setPaperWidth(parseInt(btn.dataset.width));
-            }
-        });
-
         // Test print button
         dom.btnTestPrint.addEventListener('click', sendTestPrint);
 

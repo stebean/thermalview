@@ -32,10 +32,20 @@ public class ConfigStore
 
     /// <summary>
     /// Returns the default config directory: ~/.thermalview/
+    /// Respects $SUDO_USER to ensure consistent config location under sudo.
     /// </summary>
     public static string GetDefaultConfigDir()
     {
-        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        var sudoUser = Environment.GetEnvironmentVariable("SUDO_USER");
+        string home;
+        if (!string.IsNullOrWhiteSpace(sudoUser) && sudoUser != "root")
+        {
+            home = $"/home/{sudoUser}";
+        }
+        else
+        {
+            home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        }
         return Path.Combine(home, ".thermalview");
     }
 
