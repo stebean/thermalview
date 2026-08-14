@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Thermalview — Virtual thermal printer viewer. Debug your ESC/POS print layouts in real time without a physical printer.">
+    <title>Thermalview — Virtual Thermal Printer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- ── Connection Status Bar ── -->
+    <div id="status-bar" class="status-bar status-disconnected">
+        <div class="status-indicator">
+            <span class="status-dot"></span>
+            <span id="status-text">Connecting...</span>
+        </div>
+        <div class="status-info">
+            <span id="status-clients"></span>
+        </div>
+    </div>
+
+    <!-- ── Main Layout ── -->
+    <div class="app-layout">
+        <!-- ── Sidebar ── -->
+        <aside id="sidebar" class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="4" y="2" width="16" height="6" rx="1"/>
+                        <rect x="4" y="8" width="16" height="10" rx="1"/>
+                        <path d="M8 18v4M16 18v4"/>
+                        <line x1="8" y1="12" x2="16" y2="12"/>
+                        <line x1="8" y1="15" x2="14" y2="15"/>
+                    </svg>
+                    <h1 class="logo-text">Thermalview</h1>
+                </div>
+                <p class="logo-subtitle">Virtual Thermal Printer</p>
+            </div>
+
+            <!-- Width Selector -->
+            <div class="sidebar-section">
+                <h2 class="section-title">Paper Width</h2>
+                <div class="width-selector" id="width-selector">
+                    <button class="width-btn" data-width="58">58mm</button>
+                    <button class="width-btn active" data-width="80">80mm</button>
+                    <button class="width-btn" data-width="112">112mm</button>
+                </div>
+            </div>
+
+            <!-- Ticket History -->
+            <div class="sidebar-section sidebar-section--grow">
+                <div class="section-header">
+                    <h2 class="section-title">History</h2>
+                    <button id="clear-history" class="btn-icon" title="Clear history">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                            <polyline points="3 6 5 6 21 6"/>
+                            <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+                        </svg>
+                    </button>
+                </div>
+                <div id="ticket-list" class="ticket-list">
+                    <div class="empty-state">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="40" height="40">
+                            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                            <line x1="16" y1="13" x2="8" y2="13"/>
+                            <line x1="16" y1="17" x2="8" y2="17"/>
+                        </svg>
+                        <p>No tickets yet</p>
+                        <p class="empty-hint">Print something to see it here</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="sidebar-section">
+                <button id="btn-test-print" class="btn btn-primary">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                        <polyline points="6 9 6 2 18 2 18 9"/>
+                        <path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/>
+                        <rect x="6" y="14" width="12" height="8"/>
+                    </svg>
+                    Send Test Print
+                </button>
+            </div>
+        </aside>
+
+        <!-- ── Main Content ── -->
+        <main class="main-content">
+            <div class="ticket-viewport">
+                <!-- Ticket Paper -->
+                <div id="ticket-paper" class="ticket-paper" data-width="80">
+                    <div class="paper-edge paper-edge--top"></div>
+                    <div id="ticket-content" class="ticket-content">
+                        <!-- Welcome state -->
+                        <div id="welcome-state" class="welcome-state">
+                            <div class="welcome-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" width="64" height="64">
+                                    <polyline points="6 9 6 2 18 2 18 9"/>
+                                    <path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/>
+                                    <rect x="6" y="14" width="12" height="8"/>
+                                </svg>
+                            </div>
+                            <p class="welcome-title">Waiting for print data...</p>
+                            <p class="welcome-subtitle">Send a print job to see it rendered here in real time</p>
+                        </div>
+                    </div>
+                    <div class="paper-edge paper-edge--bottom"></div>
+                </div>
+            </div>
+
+            <!-- Ticket Meta -->
+            <div id="ticket-meta" class="ticket-meta hidden">
+                <span id="meta-id" class="meta-item"></span>
+                <span id="meta-time" class="meta-item"></span>
+                <span id="meta-size" class="meta-item"></span>
+                <span id="meta-elements" class="meta-item"></span>
+            </div>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
