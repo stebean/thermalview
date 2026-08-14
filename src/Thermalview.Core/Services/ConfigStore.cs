@@ -158,4 +158,18 @@ public class ConfigStore
             .Cast<TicketData>()
             .ToList();
     }
+
+    /// <summary>
+    /// Deletes all saved tickets in the history directory.
+    /// </summary>
+    public void ClearHistory()
+    {
+        if (!Directory.Exists(TicketsDir))
+            return;
+
+        foreach (var file in Directory.GetFiles(TicketsDir, "*.json"))
+        {
+            try { File.Delete(file); } catch { }
+        }
+    }
 }

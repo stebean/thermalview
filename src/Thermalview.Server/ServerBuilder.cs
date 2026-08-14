@@ -171,6 +171,7 @@ public class ServerBuilder
 
     /// <summary>
     /// GET /api/tickets — Returns recent ticket history.
+    /// DELETE /api/tickets — Clears ticket history.
     /// </summary>
     private static void MapTicketEndpoints(WebApplication app)
     {
@@ -180,6 +181,13 @@ public class ServerBuilder
             var count = int.TryParse(ctx.Request.Query["count"], out var c) ? c : 50;
             var tickets = configStore.LoadRecentTickets(count);
             return Results.Json(new { tickets, total = tickets.Count }, JsonOptions);
+        });
+
+        app.MapDelete("/api/tickets", (HttpContext ctx) =>
+        {
+            var configStore = ctx.RequestServices.GetRequiredService<ConfigStore>();
+            configStore.ClearHistory();
+            return Results.Json(new { success = true }, JsonOptions);
         });
     }
 }

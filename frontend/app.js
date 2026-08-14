@@ -560,7 +560,13 @@
         dom.btnTestPrint.addEventListener('click', sendTestPrint);
 
         // Clear history
-        dom.btnClearHistory.addEventListener('click', () => {
+        dom.btnClearHistory.addEventListener('click', async () => {
+            try {
+                await fetch('/api/tickets', { method: 'DELETE' });
+            } catch (err) {
+                console.error('[History] Failed to clear history on server:', err);
+            }
+
             state.tickets = [];
             state.activeTicketId = null;
             updateTicketList();
@@ -570,6 +576,7 @@
             dom.ticketContent.appendChild(dom.welcomeState);
             dom.welcomeState.classList.remove('hidden');
             dom.ticketMeta.classList.add('hidden');
+            showToast('History cleared', 'success');
         });
 
         // Keyboard shortcuts
