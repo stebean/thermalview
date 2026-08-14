@@ -22,9 +22,7 @@
   <PropertyGroup Condition="'$(PublishSingleFile)' == 'true'">
     <RuntimeIdentifier>linux-x64</RuntimeIdentifier>
     <SelfContained>true</SelfContained>
-    <PublishTrimmed>true</PublishTrimmed>
-    <JsonSerializerIsReflectionDisabled>false</JsonSerializerIsReflectionDisabled>
-    <TrimmerRootDescriptor>TrimmerRoots.xml</TrimmerRootDescriptor>
+    <PublishTrimmed>false</PublishTrimmed>
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
   </PropertyGroup>
 

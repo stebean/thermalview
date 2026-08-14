@@ -14,6 +14,7 @@ public class ConfigStore
     {
         WriteIndented = true,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        PropertyNameCaseInsensitive = true,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
         TypeInfoResolver = new System.Text.Json.Serialization.Metadata.DefaultJsonTypeInfoResolver()
     };
@@ -32,21 +33,29 @@ public class ConfigStore
 
     /// <summary>
     /// Returns the default config directory: ~/.thermalview/
-    /// Respects $SUDO_USER to ensure consistent config location under sudo.
+    /// Respects $SUDO_USER and $HOME to ensure consistent config location under Linux.
     /// </summary>
     public static string GetDefaultConfigDir()
     {
         var sudoUser = Environment.GetEnvironmentVariable("SUDO_USER");
-        string home;
+        string? home = null;
+
         if (!string.IsNullOrWhiteSpace(sudoUser) && sudoUser != "root")
         {
             home = $"/home/{sudoUser}";
         }
-        else
+
+        if (string.IsNullOrWhiteSpace(home))
+        {
+            home = Environment.GetEnvironmentVariable("HOME");
+        }
+
+        if (string.IsNullOrWhiteSpace(home))
         {
             home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         }
-        return Path.Combine(home, ".thermalview");
+
+        return Path.Combine(home ?? ".", ".thermalview");
     }
 
     /// <summary>
@@ -62,11 +71,13 @@ public class ConfigStore
         lock (_lock)
         {
             if (!File.Exists(_configPath))
+            {
                 return new ThermalviewConfig();
+            }
 
             var json = File.ReadAllText(_configPath);
-            return JsonSerializer.Deserialize<ThermalviewConfig>(json, JsonOptions)
-                   ?? new ThermalviewConfig();
+            var result = JsonSerializer.Deserialize<ThermalviewConfig>(json, JsonOptions);
+            return result ?? new ThermalviewConfig();
         }
     }
 
