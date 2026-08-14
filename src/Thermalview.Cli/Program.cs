@@ -1,8 +1,13 @@
 using System.CommandLine;
+using System.Globalization;
 using System.Text.RegularExpressions;
 using Thermalview.Core.Models;
 using Thermalview.Core.Services;
 using Thermalview.Server;
+
+// Force 100% English CLI strings regardless of OS locale
+CultureInfo.DefaultThreadCurrentCulture = CultureInfo.InvariantCulture;
+CultureInfo.DefaultThreadCurrentUICulture = CultureInfo.InvariantCulture;
 
 // ──────────────────────────────────────────────
 // Thermalview CLI — Virtual Thermal Printer
