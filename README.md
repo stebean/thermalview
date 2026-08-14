@@ -132,20 +132,22 @@ final response = await http.post(
 
 ---
 
-## Supported ESC/POS Commands
+## Supported ESC/POS Commands (EPSON Standard)
 
-| Command | Description |
-|---------|-------------|
-| `ESC @` | Initialize printer |
-| `ESC a` | Set alignment (left/center/right) |
-| `ESC E` | Bold on/off |
-| `ESC -` | Underline on/off |
-| `ESC !` | Select print mode (font, bold, size) |
-| `ESC d` | Feed n lines |
-| `GS V`  | Paper cut (full/partial) |
-| `GS !`  | Character size (width/height multiplier) |
-| `GS v 0`| Raster bit image |
-| `GS k`  | Print barcode |
+Thermalview parses the **Standard EPSON ESC/POS Command Set** — the universal protocol used by EPSON (TM-T20, TM-T88, etc.), Bixolon, Star Micronics (ESC/POS mode), Xprinter, Rongta, Custom, and 99% of thermal receipt printers worldwide:
+
+| Command | Hex / Bytes | Description |
+|---------|-------------|-------------|
+| `ESC @` | `0x1B 0x40` | Initialize printer (Reset formatting) |
+| `ESC a` | `0x1B 0x61 n` | Set alignment (`0`=Left, `1`=Center, `2`=Right) |
+| `ESC E` | `0x1B 0x45 n` | Bold text on/off (`1`/`0`) |
+| `ESC -` | `0x1B 0x2D n` | Underline text on/off (`1`/`0`) |
+| `ESC !` | `0x1B 0x21 n` | Select print mode (Font B, Bold, Double height/width) |
+| `ESC d` | `0x1B 0x64 n` | Print & Feed `n` lines |
+| `GS V`  | `0x1D 0x56 n` | Paper cut (Full cut / Partial cut) |
+| `GS !`  | `0x1D 0x21 n` | Character size (Width & height multipliers) |
+| `GS v 0`| `0x1D 0x76 0` | Raster bit image (Monochrome logos & bitmaps) |
+| `GS k`  | `0x1D 0x6B m` | Barcode printing (UPC-A, EAN13, CODE39, CODE128) |
 
 ---
 
