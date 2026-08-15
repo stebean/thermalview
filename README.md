@@ -127,7 +127,7 @@ final response = await http.post(
      |
      ├── WebSocket Client → Receives tickets in real time
      ├── Ticket Renderer → Renders JSON as thermal paper
-     └── UI → Width selector, history, test prints
+     └── UI → Active printer info, history, test prints
 ```
 
 ---
