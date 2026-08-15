@@ -69,30 +69,6 @@ Printer name (no spaces): printer80mm
 
 ---
 
-## Integrating with your Application / POS (e.g. Flutter)
-
-### Option A: Print via System CUPS Queue (Native)
-Print directly from your app or system print dialog to the registered virtual printer (e.g. `printer80mm`). CUPS routes the print job to Thermalview, which immediately parses and displays the ticket.
-
-### Option B: Send ESC/POS Bytes via HTTP POST
-If your POS generates raw ESC/POS byte streams (e.g. Flutter using `esc_pos_utils_2`), send the bytes directly to Thermalview's API:
-
-```dart
-import 'package:http/http.dart' as http;
-
-// Generate raw ESC/POS bytes
-List<int> bytes = await generateReceiptBytes();
-
-// POST directly to Thermalview
-final response = await http.post(
-  Uri.parse('http://localhost:5000/api/print'),
-  headers: {'Content-Type': 'application/octet-stream'},
-  body: bytes,
-);
-```
-
----
-
 ## CLI Commands
 
 | Command | Description |
@@ -107,28 +83,7 @@ final response = await http.post(
 
 ## Architecture
 
-```
-[Your App / POS]
-     |
-     | Prints via CUPS (or HTTP POST)
-     ↓
-[CUPS Virtual Printer]
-     |
-     | cups-backend.sh → HTTP POST /api/print
-     ↓
-[Thermalview Server (ASP.NET Core)]
-     |
-     ├── ESC/POS Parser → Structured JSON
-     ├── WebSocket Hub → Broadcasts to browsers
-     ├── HTTP API → Print endpoint, config, history
-     └── Embedded Static Files → Serves frontend UI
-                ↓
-[Browser — localhost:5000]
-     |
-     ├── WebSocket Client → Receives tickets in real time
-     ├── Ticket Renderer → Renders JSON as thermal paper
-     └── UI → Active printer info, history, test prints
-```
+<img width="1536" height="1024" alt="Architecture" src="https://github.com/user-attachments/assets/3d367500-d905-4f38-92cc-253a2c240722" />
 
 ---
 
