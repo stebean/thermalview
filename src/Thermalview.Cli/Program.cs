@@ -87,8 +87,8 @@ installCommand.SetAction(async _ =>
 
     Console.WriteLine();
 
-    // ── Step 3: Find a free port ──
-    int port = FindFreePort(5000);
+    // ── Step 3: Fixed server port 5000 ──
+    int port = 5000;
 
     // ── Step 4: Register in CUPS ──
     Console.Write("  Registering printer in CUPS... ");
@@ -111,6 +111,9 @@ installCommand.SetAction(async _ =>
         Port = port
     };
     configStore.AddPrinter(printer);
+
+    // Enable active printer in CUPS and disable other virtual printers
+    EnableActiveCupsPrinter(printerName, configStore.ListPrinters());
 
     // ── Step 6: Start server ──
     WriteSuccess($"Server starting at http://localhost:{port}");
@@ -191,19 +194,22 @@ startCommand.SetAction(async parseResult =>
         return;
     }
 
+    // Enable this active printer in CUPS and disable other virtual printers
+    EnableActiveCupsPrinter(printer.Name, configStore.ListPrinters());
+
     PrintBanner();
     Console.WriteLine($"  Printer : {printer.Name}  ({printer.WidthMm}mm · {printer.CharsPerLine} chars/line)");
-    Console.WriteLine($"  Server  : http://localhost:{printer.Port}");
+    Console.WriteLine($"  Server  : http://localhost:5000");
     Console.WriteLine();
 
-    if (!noBrowser) OpenBrowser($"http://localhost:{printer.Port}");
+    if (!noBrowser) OpenBrowser("http://localhost:5000");
 
     Console.WriteLine("  Press Ctrl+C to stop");
     Console.WriteLine("  ─────────────────────────────────────────────");
     Console.WriteLine();
 
     var frontendPath = ResolveFrontendPath();
-    var app = ServerBuilder.Build(name, printer.Port, frontendPath);
+    var app = ServerBuilder.Build(name, 5000, frontendPath);
     await app.RunAsync();
 });
 
@@ -376,6 +382,28 @@ static bool RegisterCupsPrinter(string name)
     {
         Console.WriteLine($"\n  (Warning: {ex.Message})");
         return false;
+    }
+}
+
+/// <summary>
+/// Enables the active printer in CUPS and disables any inactive virtual printers.
+/// </summary>
+static void EnableActiveCupsPrinter(string activeName, IEnumerable<PrinterConfig> allPrinters)
+{
+    try
+    {
+        RunSudo($"cupsenable {activeName} && cupsaccept {activeName}");
+        foreach (var p in allPrinters)
+        {
+            if (!string.Equals(p.Name, activeName, StringComparison.OrdinalIgnoreCase))
+            {
+                RunSudo($"cupsdisable {p.Name}");
+            }
+        }
+    }
+    catch
+    {
+        /* best effort */
     }
 }
 
