@@ -117,21 +117,7 @@ installCommand.SetAction(async _ =>
 
     // ── Step 6: Start server ──
     WriteSuccess($"Server starting at http://localhost:{port}");
-
-    // Open browser
-    Console.Write("  Opening browser... ");
-    OpenBrowser($"http://localhost:{port}");
-    Console.WriteLine();
-
-    Console.WriteLine();
-    Console.WriteLine("  Press Ctrl+C to stop");
-    Console.WriteLine("  ─────────────────────────────────────────────");
-    Console.WriteLine();
-
-    // Start the server (blocking)
-    var frontendPath = ResolveFrontendPath();
-    var app = ServerBuilder.Build(printerName, port, frontendPath);
-    await app.RunAsync();
+    await RunServerAsync(printerName, port, noBrowser: false);
 });
 
 // ── thermalview start <name> ──
@@ -199,18 +185,7 @@ startCommand.SetAction(async parseResult =>
 
     PrintBanner();
     Console.WriteLine($"  Printer : {printer.Name}  ({printer.WidthMm}mm · {printer.CharsPerLine} chars/line)");
-    Console.WriteLine($"  Server  : http://localhost:5000");
-    Console.WriteLine();
-
-    if (!noBrowser) OpenBrowser("http://localhost:5000");
-
-    Console.WriteLine("  Press Ctrl+C to stop");
-    Console.WriteLine("  ─────────────────────────────────────────────");
-    Console.WriteLine();
-
-    var frontendPath = ResolveFrontendPath();
-    var app = ServerBuilder.Build(name, 5000, frontendPath);
-    await app.RunAsync();
+    await RunServerAsync(name, 5000, noBrowser);
 });
 
 // ── thermalview list ──
@@ -404,6 +379,48 @@ static void EnableActiveCupsPrinter(string activeName, IEnumerable<PrinterConfig
     catch
     {
         /* best effort */
+    }
+}
+
+/// <summary>
+/// Starts the web server gracefully with clean error messages if port is busy.
+/// </summary>
+static async Task RunServerAsync(string printerName, int port, bool noBrowser)
+{
+    Console.WriteLine($"  Server  : http://localhost:{port}");
+    Console.WriteLine();
+
+    if (!noBrowser)
+    {
+        Console.Write("  Opening browser... ");
+        OpenBrowser($"http://localhost:{port}");
+        Console.WriteLine();
+    }
+
+    Console.WriteLine();
+    Console.WriteLine("  Press Ctrl+C to stop");
+    Console.WriteLine("  ─────────────────────────────────────────────");
+    Console.WriteLine();
+
+    try
+    {
+        var frontendPath = ResolveFrontendPath();
+        var app = ServerBuilder.Build(printerName, port, frontendPath);
+        await app.RunAsync();
+    }
+    catch (Exception ex) when (ex.Message.Contains("address already in use", StringComparison.OrdinalIgnoreCase)
+                           || ex.InnerException is System.Net.Sockets.SocketException or System.IO.IOException)
+    {
+        Console.WriteLine();
+        WriteError($"Port {port} is already in use by another Thermalview process.");
+        Console.WriteLine("  Stop the existing Thermalview process first (Ctrl+C in its terminal), then try again.");
+        Console.WriteLine();
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine();
+        WriteError($"Server error: {ex.Message}");
+        Console.WriteLine();
     }
 }
 
