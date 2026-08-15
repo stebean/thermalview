@@ -112,8 +112,8 @@ installCommand.SetAction(async _ =>
     };
     configStore.AddPrinter(printer);
 
-    // Enable active printer in CUPS and disable other virtual printers
-    EnableActiveCupsPrinter(printerName, configStore.ListPrinters());
+    // Ensure all CUPS printers are enabled and accepting jobs
+    EnableAllCupsPrinters(configStore.ListPrinters());
 
     // ── Step 6: Start server ──
     WriteSuccess($"Server starting at http://localhost:{port}");
@@ -180,8 +180,8 @@ startCommand.SetAction(async parseResult =>
         return;
     }
 
-    // Enable this active printer in CUPS and disable other virtual printers
-    EnableActiveCupsPrinter(printer.Name, configStore.ListPrinters());
+    // Ensure all CUPS printers are enabled and accepting jobs
+    EnableAllCupsPrinters(configStore.ListPrinters());
 
     PrintBanner();
     Console.WriteLine($"  Printer : {printer.Name}  ({printer.WidthMm}mm · {printer.CharsPerLine} chars/line)");
@@ -361,19 +361,15 @@ static bool RegisterCupsPrinter(string name)
 }
 
 /// <summary>
-/// Enables the active printer in CUPS and disables any inactive virtual printers.
+/// Ensures all registered Thermalview printers are enabled and accepting jobs in CUPS.
 /// </summary>
-static void EnableActiveCupsPrinter(string activeName, IEnumerable<PrinterConfig> allPrinters)
+static void EnableAllCupsPrinters(IEnumerable<PrinterConfig> allPrinters)
 {
     try
     {
-        RunSudo($"cupsenable {activeName} && cupsaccept {activeName}");
         foreach (var p in allPrinters)
         {
-            if (!string.Equals(p.Name, activeName, StringComparison.OrdinalIgnoreCase))
-            {
-                RunSudo($"cupsdisable {p.Name}");
-            }
+            RunSudo($"cupsenable \"{p.Name}\" && cupsaccept \"{p.Name}\"");
         }
     }
     catch

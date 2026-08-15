@@ -59,6 +59,7 @@ if [ -n "$FILENAME" ]; then
         --max-time 10 \
         --data-binary "@$FILENAME" \
         -H "Content-Type: application/octet-stream" \
+        -H "X-Thermalview-Printer: $PRINTER" \
         -H "X-Thermalview-Job: $JOB_ID" \
         -H "X-Thermalview-User: $USER" \
         -H "X-Thermalview-Title: $TITLE" \
@@ -68,6 +69,7 @@ else
         --max-time 10 \
         --data-binary @- \
         -H "Content-Type: application/octet-stream" \
+        -H "X-Thermalview-Printer: $PRINTER" \
         -H "X-Thermalview-Job: $JOB_ID" \
         -H "X-Thermalview-User: $USER" \
         -H "X-Thermalview-Title: $TITLE" \

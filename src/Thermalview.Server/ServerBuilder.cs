@@ -117,13 +117,16 @@ public class ServerBuilder
                 return Results.Json(new { error = "Empty request body" }, JsonOptions);
             }
 
-            // Get printer config for width info
-            var printer = configStore.GetPrinter(printerName);
+            // Check X-Thermalview-Printer header or fallback to default server printerName
+            string requestedPrinter = ctx.Request.Headers["X-Thermalview-Printer"].FirstOrDefault() ?? printerName;
+            var printer = configStore.GetPrinter(requestedPrinter) ?? configStore.GetPrinter(printerName);
+
             int widthMm = printer?.WidthMm ?? 80;
             int charsPerLine = printer?.CharsPerLine ?? 48;
+            string effectiveName = printer?.Name ?? requestedPrinter;
 
             // Parse ESC/POS data
-            var ticket = parser.Parse(rawData, printerName, widthMm, charsPerLine);
+            var ticket = parser.Parse(rawData, effectiveName, widthMm, charsPerLine);
 
             Console.WriteLine($"[Print] Received {rawData.Length} bytes → {ticket.Elements.Count} elements (ticket {ticket.Id})");
 
